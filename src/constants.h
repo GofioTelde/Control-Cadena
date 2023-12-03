@@ -13,6 +13,8 @@ const int pinCorte = 4;
 const int pinSistemaAutomaticoAnulado = 22;
 const int pinLedError = 18;
 
-const int tiempoMaximoTrabajo = 6500;       // 6.5 segundos
-const int tiempoTrabajoArranque = 1000;     // 1 segundo
-const int tiempoMaximoCadenaBajada = 10000; // 10 segundos
+const unsigned long tiempoMaximoTrabajo = 6500;       // 6.5 segundos
+const unsigned long tiempoTrabajoArranque = 1000;     // 1 segundo
+const unsigned long tiempoMaximoCadenaBajada = 10000; // 10 segundos
+
+const unsigned long tiempoMandoPresionado = 600; // 0.6 segundos
