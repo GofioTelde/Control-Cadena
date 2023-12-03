@@ -152,11 +152,20 @@ void setup()
   pinMode(pinMando, INPUT_PULLDOWN);
   pinMode(pinFinCarreraArriba, INPUT_PULLDOWN);
   pinMode(pinFinCarreraAbajo, INPUT_PULLDOWN);
+  pinMode(pinSistemaAutomaticoAnulado, INPUT_PULLDOWN);
+  pinMode(pinCorte, INPUT_PULLDOWN);
+  pinMode(pinBotonSubirManual, INPUT_PULLDOWN);
+  pinMode(pinBotonBajarManual, INPUT_PULLDOWN);
 
   pinMode(pinArranqueArriba, OUTPUT);
   pinMode(pinArranqueAbajo, OUTPUT);
   pinMode(pinLedError, OUTPUT);
   Serial.println("Finalizado Setup");
+
+  if (obtenerEstadoCadena() != ABAJO)
+  {
+    arrancarMotor(false);
+  }
 }
 
 void loop()
@@ -168,6 +177,25 @@ void loop()
       digitalWrite(pinLedError, HIGH);
       ledErrorEncendido = true;
     }
+
+    if (digitalRead(pinBotonSubirManual) == HIGH)
+    {
+      arrancarMotor(true);
+      while (digitalRead(pinBotonSubirManual) == HIGH)
+      {
+      }
+
+      apagarMotor();
+    }
+    else if (digitalRead(pinBotonBajarManual) == HIGH)
+    {
+      arrancarMotor(false);
+      while (digitalRead(pinBotonBajarManual) == HIGH)
+      {
+      }
+
+      apagarMotor();
+    }
   }
   else
   {
@@ -175,13 +203,25 @@ void loop()
     {
       digitalWrite(pinLedError, LOW);
       ledErrorEncendido = false;
+      if (obtenerEstadoCadena() == ABAJO)
+      {
+        tiempoCadenaBajada = 0;
+        cadenaBajada = true;
+      }
     }
     gestionMando();
 
     EstadoCadena estadoCadena = obtenerEstadoCadena();
+
     if (estadoCadena == NINGUNO && !cadenaEnMovimiento())
     {
       error = true;
+    }
+
+    if (cadenaBajada && !cadenaEnMovimiento() && tiempoCadenaBajada > tiempoMaximoCadenaBajada && digitalRead(pinSistemaAutomaticoAnulado) == LOW)
+    {
+      Serial.println("Tiempo cadena bajada excedido, subiendo automaticamente");
+      arrancarMotor(true);
     }
   }
 
@@ -201,9 +241,8 @@ void loop()
     }
   }
 
-  if (cadenaBajada && !cadenaEnMovimiento() && tiempoCadenaBajada > tiempoMaximoCadenaBajada)
+  if (digitalRead(pinCorte) == HIGH && !error)
   {
-    Serial.println("Tiempo cadena bajada excedido, subiendo automaticamente");
-    arrancarMotor(true);
+    error = true;
   }
 }
