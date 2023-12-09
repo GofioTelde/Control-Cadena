@@ -12,9 +12,14 @@ const int pinBotonBajarManual = 33;
 const int pinCorte = 4;
 const int pinSistemaAutomaticoAnulado = 22;
 const int pinLedError = 18;
+const int pinTipoMotor = 14;
 
-const unsigned long tiempoMaximoTrabajo = 6500;       // 6.5 segundos
-const unsigned long tiempoTrabajoArranque = 1000;     // 1 segundo
-const unsigned long tiempoMaximoCadenaBajada = 10000; // 10 segundos
+// Variable que controla cuanto tiempo tarda en bajar si la cadena esta subiendo y no llega arriba
+const unsigned long tiempoEntreSubirYBajar = 500; // 0.5 segundos
 
-const unsigned long tiempoMandoPresionado = 600; // 0.6 segundos
+const unsigned long tiempoMaximoTrabajo = 6000;        // 6 segundos
+const unsigned long tiempoTrabajoArranque = 500;       // 0.5 segundos
+const unsigned long tiempoMaximoCadenaBajada = 120000; // 2 minutos
+
+const unsigned long tiempoMandoPresionado = 1000;   // 1 segundo
+const unsigned long tiempoIgnorarEnArranque = 1500; //  1.5 segundos

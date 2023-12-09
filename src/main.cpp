@@ -8,6 +8,9 @@ bool error = false;
 bool buttonPressed = false; // Añade esta línea
 bool accionRealizada = false;
 
+// tipo Motor
+bool isTrifasico = true;
+
 // cadena
 bool cadenaSubiendo = false;
 bool cadenaBajando = false;
@@ -53,10 +56,12 @@ void apagarMotor()
   Serial.println("Apagando motor");
   digitalWrite(pinArranqueArriba, LOW);
   digitalWrite(pinArranqueAbajo, LOW);
+  digitalWrite(pinMotorTrabajo, LOW);
   cadenaSubiendo = false;
   cadenaBajando = false;
 }
 
+elapsedMillis tiempoArranqueMotor;
 void arrancarMotor(bool haciaArriba)
 {
   cadenaBajada = false;
@@ -65,6 +70,11 @@ void arrancarMotor(bool haciaArriba)
     Serial.println("Arrancando motor hacia arriba");
     digitalWrite(pinArranqueArriba, HIGH);
     digitalWrite(pinArranqueAbajo, LOW);
+    if (!isTrifasico)
+    {
+      digitalWrite(pinMotorTrabajo, HIGH);
+    }
+
     cadenaBajando = false;
     cadenaSubiendo = true;
   }
@@ -73,20 +83,42 @@ void arrancarMotor(bool haciaArriba)
     Serial.println("Arrancando motor hacia abajo");
     digitalWrite(pinArranqueArriba, LOW);
     digitalWrite(pinArranqueAbajo, HIGH);
+    if (!isTrifasico)
+    {
+      digitalWrite(pinMotorTrabajo, HIGH);
+    }
     cadenaBajando = true;
     cadenaSubiendo = false;
   }
-  tiempoTrabajo = 0;
+  tiempoArranqueMotor = 0;
+
+  while (tiempoIgnorarEnArranque > tiempoArranqueMotor)
+  {
+    if (digitalRead(pinCorte) == LOW)
+    {
+      error = true;
+      apagarMotor();
+      break;
+    }
+
+    if (!isTrifasico && tiempoArranqueMotor > tiempoTrabajoArranque)
+    {
+      digitalWrite(pinArranqueArriba, LOW);
+      digitalWrite(pinArranqueAbajo, LOW);
+    }
+  }
+
+  if (!error)
+  {
+    tiempoTrabajo = 0;
+  }
+  else
+  {
+    apagarMotor();
+  }
 }
 
-void comprobarPosicionCadena()
-{
-}
-
-/**
- *  este código realiza una acción una vez si el botón ha sido presionado
- *  durante más de tiempoMandoPresionado milisegundos
- */
+// Controla la funcionalidad de mantener el mando pulsado
 void gestionMando()
 {
 
@@ -127,7 +159,7 @@ void gestionMando()
 void leerFinesCarrera()
 {
   EstadoCadena estadoCadena = obtenerEstadoCadena();
-  if (estadoCadena == ARRIBA || estadoCadena == ABAJO)
+  if (estadoCadena == ARRIBA || estadoCadena == ABAJO && digitalRead(pinCorte) == HIGH)
   {
     error = false;
   }
@@ -156,20 +188,98 @@ void setup()
   pinMode(pinCorte, INPUT_PULLDOWN);
   pinMode(pinBotonSubirManual, INPUT_PULLDOWN);
   pinMode(pinBotonBajarManual, INPUT_PULLDOWN);
+  pinMode(pinTipoMotor, INPUT_PULLDOWN);
 
+  pinMode(pinMotorTrabajo, OUTPUT);
   pinMode(pinArranqueArriba, OUTPUT);
   pinMode(pinArranqueAbajo, OUTPUT);
   pinMode(pinLedError, OUTPUT);
+
+  isTrifasico = digitalRead(pinTipoMotor) == HIGH ? false : true;
   Serial.println("Finalizado Setup");
 
-  if (obtenerEstadoCadena() != ABAJO)
+  if (obtenerEstadoCadena() == NINGUNO)
   {
     arrancarMotor(false);
   }
 }
 
+elapsedMillis tiempoArranqueManual;
+void arrancarMotorError(bool haciaArriba)
+{
+  if (haciaArriba)
+  {
+    Serial.println("Arrancando motor hacia arriba");
+    digitalWrite(pinArranqueArriba, HIGH);
+    digitalWrite(pinArranqueAbajo, LOW);
+    tiempoArranqueManual = 0;
+    if (!isTrifasico)
+    {
+      digitalWrite(pinMotorTrabajo, HIGH);
+    }
+    cadenaBajando = false;
+    cadenaSubiendo = true;
+  }
+  else
+  {
+    Serial.println("Arrancando motor hacia abajo");
+    digitalWrite(pinArranqueArriba, LOW);
+    digitalWrite(pinArranqueAbajo, HIGH);
+    tiempoArranqueManual = 0;
+    if (!isTrifasico)
+    {
+      digitalWrite(pinMotorTrabajo, HIGH);
+    }
+    cadenaBajando = true;
+    cadenaSubiendo = false;
+  }
+
+  if (!isTrifasico)
+  {
+    while (
+        (digitalRead(pinBotonSubirManual) == HIGH || digitalRead(pinBotonBajarManual) == HIGH) &&
+        tiempoArranqueManual < tiempoTrabajoArranque)
+    {
+    }
+    digitalWrite(pinArranqueArriba, LOW);
+    digitalWrite(pinArranqueAbajo, LOW);
+  }
+}
+
+void gestionarArranqueManual()
+{
+  if (digitalRead(pinBotonSubirManual) == HIGH)
+  {
+    arrancarMotorError(true);
+    while (digitalRead(pinBotonSubirManual) == HIGH)
+    {
+    }
+
+    apagarMotor();
+  }
+  else if (digitalRead(pinBotonBajarManual) == HIGH)
+  {
+    arrancarMotorError(false);
+    while (digitalRead(pinBotonBajarManual) == HIGH)
+    {
+    }
+
+    apagarMotor();
+  }
+}
+
 void loop()
 {
+  if (digitalRead(pinCorte) == LOW)
+  {
+    apagarMotor();
+    error = true;
+    if (digitalRead(pinLedError) == LOW)
+    {
+      digitalWrite(pinLedError, HIGH);
+    }
+  }
+
   if (error)
   {
     if (!ledErrorEncendido)
@@ -178,27 +288,11 @@ void loop()
       ledErrorEncendido = true;
     }
 
-    if (digitalRead(pinBotonSubirManual) == HIGH)
-    {
-      arrancarMotor(true);
-      while (digitalRead(pinBotonSubirManual) == HIGH)
-      {
-      }
-
-      apagarMotor();
-    }
-    else if (digitalRead(pinBotonBajarManual) == HIGH)
-    {
-      arrancarMotor(false);
-      while (digitalRead(pinBotonBajarManual) == HIGH)
-      {
-      }
-
-      apagarMotor();
-    }
+    gestionarArranqueManual();
   }
   else
   {
+    // si el led error esta encendido, lo apagamos
     if (ledErrorEncendido)
     {
       digitalWrite(pinLedError, LOW);
@@ -223,26 +317,23 @@ void loop()
       Serial.println("Tiempo cadena bajada excedido, subiendo automaticamente");
       arrancarMotor(true);
     }
+
+    if (tiempoTrabajo > (tiempoMaximoTrabajo - tiempoIgnorarEnArranque) && !error && cadenaEnMovimiento())
+    {
+      if (cadenaSubiendo)
+      {
+        Serial.println("Tiempo máximo de trabajo alcanzado, y ademas subiendo, bajando automaticamente");
+        apagarMotor();
+        delay(500);
+        arrancarMotor(false);
+      }
+      else
+      {
+        Serial.println("Tiempo máximo de trabajo alcanzado");
+        apagarMotor();
+      }
+    }
   }
 
   leerFinesCarrera();
-
-  if (tiempoTrabajo > tiempoMaximoTrabajo && !error && cadenaEnMovimiento())
-  {
-    if (cadenaSubiendo)
-    {
-      Serial.println("Tiempo máximo de trabajo alcanzado, y ademas subiendo, bajando automaticamente");
-      arrancarMotor(false);
-    }
-    else
-    {
-      Serial.println("Tiempo máximo de trabajo alcanzado");
-      apagarMotor();
-    }
-  }
-
-  if (digitalRead(pinCorte) == HIGH && !error)
-  {
-    error = true;
-  }
 }
