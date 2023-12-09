@@ -2,6 +2,10 @@
 
 Este proyecto es un sistema de control de motor diseñado para mover una cadena hacia arriba y hacia abajo. Incluye botones de control manual, un control remoto y características de seguridad, como detener el motor si ha estado funcionando durante demasiado tiempo.
 
+## Como funciona¿?
+
+[Explicacion del codigo](./explicacion.md)
+
 ## Características
 
 - Botones de control manual
