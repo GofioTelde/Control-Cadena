@@ -84,6 +84,7 @@ void arrancarMotor(bool haciaArriba)
     estadoMotor = BAJANDO;
   }
   tiempoMotorEncendido = 0;
+  delay(400); // tiempo para ignorar ruido de reles.
 }
 
 // Controla la funcionalidad de mantener el mando pulsado
@@ -286,7 +287,6 @@ void loop()
     {
       Serial.println("Tiempo cadena bajada excedido, subiendo automaticamente");
       arrancarMotor(true);
-      delay(1000); // tiempo para ignorar ruido de reles.
     }
 
     if (tiempoMotorEncendido > (tiempoMaximoTrabajo) && !error && (estadoMotor == SUBIENDO || estadoMotor == BAJANDO))
