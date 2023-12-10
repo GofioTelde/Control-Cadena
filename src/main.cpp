@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "EstadoCadena.h"
+#include "EstadoMotor.h"
 
 bool error = false;
 bool buttonPressed = false; // Añade esta línea
@@ -12,21 +13,16 @@ bool accionRealizada = false;
 bool isTrifasico = true;
 
 // cadena
-bool cadenaSubiendo = false;
-bool cadenaBajando = false;
 bool cadenaBajada = false;
 
 // error
 bool ledErrorEncendido = false;
 
-elapsedMillis mandoPulsado;  // Tiempo transcurrido desde la última vez que el pinMando fue pulsado
-elapsedMillis tiempoTrabajo; // Tiempo transcurrido desde que se arrancó el motor
+elapsedMillis mandoPulsado;         // Tiempo transcurrido desde la última vez que el pinMando fue pulsado
+elapsedMillis tiempoMotorEncendido; // Tiempo transcurrido desde que se arrancó el motor
 elapsedMillis tiempoCadenaBajada;
 
-bool cadenaEnMovimiento()
-{
-  return cadenaSubiendo || cadenaBajando;
-}
+EstadoMotor estadoMotor;
 
 EstadoCadena obtenerEstadoCadena()
 {
@@ -57,8 +53,7 @@ void apagarMotor()
   digitalWrite(pinArranqueArriba, LOW);
   digitalWrite(pinArranqueAbajo, LOW);
   digitalWrite(pinMotorTrabajo, LOW);
-  cadenaSubiendo = false;
-  cadenaBajando = false;
+  estadoMotor = APAGADO;
 }
 
 elapsedMillis tiempoArranqueMotor;
@@ -75,8 +70,7 @@ void arrancarMotor(bool haciaArriba)
       digitalWrite(pinMotorTrabajo, HIGH);
     }
 
-    cadenaBajando = false;
-    cadenaSubiendo = true;
+    estadoMotor = SUBIENDO;
   }
   else
   {
@@ -87,35 +81,9 @@ void arrancarMotor(bool haciaArriba)
     {
       digitalWrite(pinMotorTrabajo, HIGH);
     }
-    cadenaBajando = true;
-    cadenaSubiendo = false;
+    estadoMotor = BAJANDO;
   }
-  tiempoArranqueMotor = 0;
-
-  while (tiempoIgnorarEnArranque > tiempoArranqueMotor)
-  {
-    if (digitalRead(pinCorte) == LOW)
-    {
-      error = true;
-      apagarMotor();
-      break;
-    }
-
-    if (!isTrifasico && tiempoArranqueMotor > tiempoTrabajoArranque)
-    {
-      digitalWrite(pinArranqueArriba, LOW);
-      digitalWrite(pinArranqueAbajo, LOW);
-    }
-  }
-
-  if (!error)
-  {
-    tiempoTrabajo = 0;
-  }
-  else
-  {
-    apagarMotor();
-  }
+  tiempoMotorEncendido = 0;
 }
 
 // Controla la funcionalidad de mantener el mando pulsado
@@ -163,12 +131,12 @@ void leerFinesCarrera()
   {
     error = false;
   }
-  if (estadoCadena == ARRIBA && cadenaSubiendo)
+  if (estadoCadena == ARRIBA && estadoMotor == SUBIENDO)
   {
     Serial.println("Fin de carrera arriba");
     apagarMotor();
   }
-  if (estadoCadena == ABAJO && cadenaBajando)
+  if (estadoCadena == ABAJO && estadoMotor == BAJANDO)
   {
     Serial.println("Fin de carrera abajo");
     cadenaBajada = true;
@@ -217,8 +185,6 @@ void arrancarMotorError(bool haciaArriba)
     {
       digitalWrite(pinMotorTrabajo, HIGH);
     }
-    cadenaBajando = false;
-    cadenaSubiendo = true;
   }
   else
   {
@@ -230,8 +196,6 @@ void arrancarMotorError(bool haciaArriba)
     {
       digitalWrite(pinMotorTrabajo, HIGH);
     }
-    cadenaBajando = true;
-    cadenaSubiendo = false;
   }
 
   if (!isTrifasico)
@@ -307,20 +271,27 @@ void loop()
 
     EstadoCadena estadoCadena = obtenerEstadoCadena();
 
-    if (estadoCadena == NINGUNO && !cadenaEnMovimiento())
+    if ((estadoMotor == SUBIENDO || estadoMotor == BAJANDO) && !isTrifasico && tiempoMotorEncendido > tiempoTrabajoArranque)
+    {
+      digitalWrite(pinArranqueAbajo, LOW);
+      digitalWrite(pinArranqueArriba, LOW);
+    }
+
+    if (estadoCadena == NINGUNO && estadoMotor == APAGADO)
     {
       error = true;
     }
 
-    if (cadenaBajada && !cadenaEnMovimiento() && tiempoCadenaBajada > tiempoMaximoCadenaBajada && digitalRead(pinSistemaAutomaticoAnulado) == LOW)
+    if (estadoCadena == ABAJO && estadoMotor == APAGADO && tiempoCadenaBajada > tiempoMaximoCadenaBajada && digitalRead(pinSistemaAutomaticoAnulado) == LOW)
     {
       Serial.println("Tiempo cadena bajada excedido, subiendo automaticamente");
       arrancarMotor(true);
+      delay(1000); // tiempo para ignorar ruido de reles.
     }
 
-    if (tiempoTrabajo > (tiempoMaximoTrabajo - tiempoIgnorarEnArranque) && !error && cadenaEnMovimiento())
+    if (tiempoMotorEncendido > (tiempoMaximoTrabajo) && !error && (estadoMotor == SUBIENDO || estadoMotor == BAJANDO))
     {
-      if (cadenaSubiendo)
+      if (estadoMotor == SUBIENDO)
       {
         Serial.println("Tiempo máximo de trabajo alcanzado, y ademas subiendo, bajando automaticamente");
         apagarMotor();
